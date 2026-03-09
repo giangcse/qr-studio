@@ -1,30 +1,14 @@
-import { serveStatic } from "wrangler";
-
 export default {
   async fetch(request, env, ctx): Promise<Response> {
     const url = new URL(request.url);
 
-    // Luôn trả index.html cho route SPA
-    if (url.pathname === "/" || !url.pathname.includes(".")) {
-      return await serveStatic(request, env.ASSETS, {
-        mapRequestToAsset: (req) => {
-          const u = new URL(req.url);
-          u.pathname = "/index.html";
-          return new Request(u.toString(), req);
-        },
-      });
+    // Nếu là request cho file tĩnh (có dấu chấm trong path), trả thẳng từ ASSETS
+    if (url.pathname.includes(".")) {
+      return env.ASSETS.fetch(request);
     }
 
-    // File tĩnh (JS/CSS/png/svg, ...)
-    const asset = await serveStatic(request, env.ASSETS);
-    if (asset.status === 404) {
-      // fallback về SPA nếu asset không tồn tại
-      const u = new URL(request.url);
-      u.pathname = "/index.html";
-      return await serveStatic(new Request(u.toString(), request), env.ASSETS);
-    }
-
-    return asset;
+    // Với mọi route còn lại, luôn trả index.html (SPA fallback)
+    const indexUrl = new URL("/index.html", request.url);
+    return env.ASSETS.fetch(new Request(indexUrl.toString(), request));
   },
 } satisfies ExportedHandler<{ ASSETS: Fetcher }>;
-
