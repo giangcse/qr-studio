@@ -17,9 +17,40 @@ import { ColorControls } from "./components/qr/ColorControls";
 import { LogoUploader } from "./components/qr/LogoUploader";
 import { PreviewPanel } from "./components/qr/PreviewPanel";
 import { Toast } from "./components/ui/Toast";
+import { buildQrPayload } from "./lib/qrPayload";
+import { qrContentPresets } from "./config/qrPresets";
+import {
+  loadMyTemplates,
+  loadRecentConfigs,
+  saveMyTemplate,
+  saveRecentConfig,
+} from "./lib/localStorage";
 
 const defaultConfig = {
   text: "https://google.com",
+  qrType: "url",
+  wifiConfig: {
+    ssid: "",
+    password: "",
+    security: "WPA",
+    hidden: false,
+  },
+  vcardConfig: {
+    fullName: "",
+    phone: "",
+    email: "",
+    company: "",
+    title: "",
+  },
+  emailConfig: {
+    to: "",
+    subject: "",
+    body: "",
+  },
+  smsConfig: {
+    to: "",
+    body: "",
+  },
   dotsType: "square",
   cornersType: "square",
   cornersDotType: "square",
@@ -37,8 +68,12 @@ export default function App() {
   const [activeTab, setActiveTab] = useState("content");
   const [theme, setTheme] = useState("system"); // system | light | dark
   const [toast, setToast] = useState(null);
+  const [recentConfigs, setRecentConfigs] = useState([]);
+  const [templates, setTemplates] = useState([]);
+  const [shareCaption, setShareCaption] = useState("");
 
-  const { qrRef, download, copyToClipboard } = useQrStyling(config);
+  const payload = buildQrPayload(config);
+  const { qrRef, download, copyToClipboard } = useQrStyling(config, payload);
 
   const updateConfig = (partial) => {
     setConfig((prev) => ({ ...prev, ...partial }));
@@ -62,6 +97,42 @@ export default function App() {
     const root = document.documentElement;
     root.classList.toggle("dark", resolvedTheme === "dark");
   }, [resolvedTheme]);
+
+  useEffect(() => {
+    const base =
+      config.qrType === "vcard"
+        ? "Quét mã QR này để lưu thông tin liên hệ của mình nhé."
+        : config.qrType === "wifi"
+          ? "Quét mã QR này để kết nối vào WiFi nhanh chóng."
+          : config.qrType === "email"
+            ? "Quét mã QR này để gửi email cho mình."
+            : config.qrType === "sms"
+              ? "Quét mã QR này để gửi tin nhắn cho mình."
+              : "Quét mã QR này để truy cập nhanh nhé.";
+    setShareCaption(base);
+  }, [config.qrType]);
+
+  useEffect(() => {
+    setRecentConfigs(loadRecentConfigs());
+    setTemplates(loadMyTemplates());
+  }, []);
+
+  const persistRecent = (nextConfig) => {
+    saveRecentConfig(nextConfig);
+    setRecentConfigs(loadRecentConfigs());
+  };
+
+  const handleSaveTemplate = () => {
+    const name = window.prompt("Đặt tên cho mẫu QR này:");
+    if (!name) return;
+    saveMyTemplate(name, config);
+    setTemplates(loadMyTemplates());
+    showToast({
+      tone: "success",
+      title: "Đã lưu mẫu",
+      message: "Bạn có thể dùng lại mẫu này trong mục “Mẫu của tôi”.",
+    });
+  };
 
   const tabs = [
     { id: "content", label: "Nội dung", icon: <Type size={18} /> },
@@ -144,8 +215,27 @@ export default function App() {
                   aria-labelledby="tab-content"
                 >
                   <ContentForm
+                    qrType={config.qrType}
+                    onQrTypeChange={(type) => updateConfig({ qrType: type })}
                     value={config.text}
                     onChange={(value) => updateConfig({ text: value })}
+                    wifiConfig={config.wifiConfig}
+                    onWifiChange={(next) => updateConfig({ wifiConfig: next })}
+                    vcardConfig={config.vcardConfig}
+                    onVcardChange={(next) =>
+                      updateConfig({ vcardConfig: next })
+                    }
+                    emailConfig={config.emailConfig}
+                    onEmailChange={(next) =>
+                      updateConfig({ emailConfig: next })
+                    }
+                    smsConfig={config.smsConfig}
+                    onSmsChange={(next) => updateConfig({ smsConfig: next })}
+                    onPresetClick={(id) => {
+                      const preset = qrContentPresets.find((p) => p.id === id);
+                      if (!preset) return;
+                      setConfig((prev) => preset.apply(prev));
+                    }}
                   />
                 </div>
               )}
@@ -224,29 +314,120 @@ export default function App() {
           </div>
 
           <div className="lg:col-span-5 xl:col-span-4 order-1 lg:order-2">
-            <PreviewPanel
-              qrRef={qrRef}
-              text={config.text}
-              size={config.size}
-              copied={copied}
-              onCopy={async () => {
-                const ok = await copyToClipboard();
-                if (ok) {
-                  setCopied(true);
-                  setTimeout(() => setCopied(false), 2000);
-                } else {
-                  showToast({
-                    tone: "error",
-                    title: "Không sao chép được ảnh",
-                    message:
-                      "Trình duyệt có thể không hỗ trợ sao chép ảnh. Bạn hãy dùng nút “Tải PNG” để lưu về máy.",
-                  });
-                }
-              }}
-              onDownloadPng={() => download("png")}
-              onDownloadSvg={() => download("svg")}
-              onSizeChange={(value) => updateConfig({ size: value })}
-            />
+            <div className="space-y-4">
+              <PreviewPanel
+                qrRef={qrRef}
+                text={config.text}
+                size={config.size}
+                copied={copied}
+                onCopy={async () => {
+                  const ok = await copyToClipboard();
+                  if (ok) {
+                    setCopied(true);
+                    setTimeout(() => setCopied(false), 2000);
+                    persistRecent(config);
+                  } else {
+                    showToast({
+                      tone: "error",
+                      title: "Không sao chép được ảnh",
+                      message:
+                        "Trình duyệt có thể không hỗ trợ sao chép ảnh. Bạn hãy dùng nút “Tải PNG” để lưu về máy.",
+                    });
+                  }
+                }}
+                onDownloadPng={() => {
+                  download("png");
+                  persistRecent(config);
+                }}
+                onDownloadSvg={() => {
+                  download("svg");
+                  persistRecent(config);
+                }}
+                onSizeChange={(value) => updateConfig({ size: value })}
+                onSizePresetChange={(value) => updateConfig({ size: value })}
+                caption={shareCaption}
+                onCaptionChange={setShareCaption}
+                onCopyCaption={() => {
+                  if (!shareCaption) return;
+                  if (navigator.clipboard?.writeText) {
+                    navigator.clipboard
+                      .writeText(shareCaption)
+                      .then(() =>
+                        showToast({
+                          tone: "success",
+                          title: "Đã sao chép caption",
+                          message:
+                            "Hãy dán caption này vào Zalo, Telegram hoặc app chat bạn đang dùng.",
+                        }),
+                      )
+                      .catch(() =>
+                        showToast({
+                          tone: "error",
+                          title: "Không sao chép được caption",
+                          message:
+                            "Trình duyệt chặn quyền copy. Bạn hãy chọn và copy caption thủ công.",
+                        }),
+                      );
+                  }
+                }}
+              />
+
+              {(recentConfigs.length > 0 || templates.length > 0) && (
+                <div className="bg-white dark:bg-slate-900 p-4 rounded-2xl border border-slate-100 dark:border-slate-800 space-y-4">
+                  {recentConfigs.length > 0 && (
+                    <div>
+                      <div className="flex items-center justify-between mb-2">
+                        <h4 className="text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wide">
+                          Lịch sử gần đây
+                        </h4>
+                      </div>
+                      <div className="flex flex-wrap gap-2">
+                        {recentConfigs.map((item, idx) => (
+                          <button
+                            key={idx}
+                            type="button"
+                            onClick={() => setConfig(item)}
+                            className="px-3 py-2 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-950 text-xs text-slate-700 dark:text-slate-200 hover:border-indigo-400 dark:hover:border-indigo-500 transition-all"
+                          >
+                            QR #{idx + 1} ({item.qrType})
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  {templates.length > 0 && (
+                    <div>
+                      <div className="flex items-center justify-between mb-2">
+                        <h4 className="text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wide">
+                          Mẫu của tôi
+                        </h4>
+                      </div>
+                      <div className="flex flex-wrap gap-2">
+                        {templates.map((tpl) => (
+                          <button
+                            key={tpl.id}
+                            type="button"
+                            onClick={() => setConfig(tpl.config)}
+                            className="px-3 py-2 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-950 text-xs text-slate-700 dark:text-slate-200 hover:border-indigo-400 dark:hover:border-indigo-500 transition-all"
+                          >
+                            {tpl.name}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  <button
+                    type="button"
+                    onClick={handleSaveTemplate}
+                    className="w-full mt-2 px-3 py-2 rounded-xl border border-dashed border-slate-300 dark:border-slate-700 text-xs font-semibold text-slate-600 dark:text-slate-300 hover:border-indigo-400 dark:hover:border-indigo-500 hover:text-indigo-600 dark:hover:text-indigo-400 transition-all"
+                  >
+                    Lưu cấu hình hiện tại thành mẫu
+                  </button>
+                </div>
+              )}
+            </div>
           </div>
         </div>
       </main>

@@ -1,7 +1,7 @@
 import { useEffect, useRef } from "react";
 import { QRCodeStyling } from "../lib/qrCodeStylingLoader";
 
-export const useQrStyling = (config) => {
+export const useQrStyling = (config, data) => {
   const qrRef = useRef(null);
   const qrCodeInstance = useRef(null);
 
@@ -13,7 +13,7 @@ export const useQrStyling = (config) => {
         width: config.size,
         height: config.size,
         margin: 16,
-        data: config.text,
+        data,
         image: config.logo,
         dotsOptions: {
           color: config.useGradient ? undefined : config.fgColor,
@@ -60,7 +60,7 @@ export const useQrStyling = (config) => {
     };
 
     qrCodeInstance.current.update({
-      data: config.text,
+      data,
       width: config.size,
       height: config.size,
       margin: 16,

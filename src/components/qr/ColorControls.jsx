@@ -1,3 +1,5 @@
+import { contrastRatio } from "../../lib/colorUtils";
+
 export function ColorControls({
   fgColor,
   bgColor,
@@ -21,6 +23,9 @@ export function ColorControls({
     { id: "slate", label: "Slate", fg: "#0f172a", bg: "#ffffff", gradient: "#334155" },
     { id: "mono", label: "Mono", fg: "#111827", bg: "#f9fafb", gradient: "#111827" },
   ];
+
+  const ratio = contrastRatio(fgColor, bgColor);
+  const isLowContrast = ratio < 3;
 
   return (
     <div className="bg-white dark:bg-slate-900 p-6 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-sm animate-in fade-in slide-in-from-bottom-2">
@@ -92,7 +97,22 @@ export function ColorControls({
           </div>
         </div>
 
-        <div className="pt-6 border-t border-slate-100 dark:border-slate-800">
+        <div className="pt-6 border-t border-slate-100 dark:border-slate-800 space-y-3">
+          {Number.isFinite(ratio) && (
+            <div className="flex items-center justify-between text-xs">
+              <span className="text-slate-500 dark:text-slate-400">
+                Độ tương phản ước tính:{" "}
+                <span className="font-mono font-semibold">
+                  {ratio.toFixed(2)} : 1
+                </span>
+              </span>
+              {isLowContrast && (
+                <span className="inline-flex items-center gap-1 px-2 py-1 rounded-full bg-amber-100 text-amber-800 dark:bg-amber-900/40 dark:text-amber-200 font-semibold">
+                  Có thể khó quét
+                </span>
+              )}
+            </div>
+          )}
           <div className="flex items-center justify-between mb-4">
             <span className="text-sm font-semibold text-slate-600 dark:text-slate-300">
               Sử dụng màu Gradient
