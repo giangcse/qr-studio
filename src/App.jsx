@@ -27,7 +27,7 @@ import {
 } from "./lib/localStorage";
 
 const defaultConfig = {
-  text: "https://google.com",
+  text: "https://qr.giangpt.dev",
   qrType: "url",
   wifiConfig: {
     ssid: "",
