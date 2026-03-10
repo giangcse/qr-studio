@@ -46,8 +46,10 @@ export function buildQrPayload(config: QrConfig): string {
       const s = config.smsConfig;
       if (!s || !s.to) return config.text || "";
       if (s.body) {
-        const encoded = encodeURIComponent(s.body);
-        return `SMSTO:${s.to}:${encoded}`;
+        // Để nguyên nội dung SMS dưới dạng Unicode, không URL-encode
+        // để các app đọc QR không phải tự decode phần trăm (%XX),
+        // giúp hiển thị tiếng Việt có dấu chính xác hơn.
+        return `SMSTO:${s.to}:${s.body}`;
       }
       return `SMSTO:${s.to}`;
     }
